@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/xsjk/wintun/iphlpapi"
-	"github.com/xsjk/wintun/kernel32"
-
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/xsjk/go-wintun/iphlpapi"
+	"github.com/xsjk/go-wintun/kernel32"
 	"golang.org/x/sys/windows"
 	tun "golang.zx2c4.com/wintun"
 )
