@@ -22,7 +22,20 @@ type Interface struct {
 	session   tun.Session
 	stopEvent windows.Handle
 	readEvent windows.Handle
-	channel   chan gopacket.Packet
+	channel   chan []byte
+}
+
+func Decode(data []byte) gopacket.Packet {
+	var layerType gopacket.LayerType
+	switch data[0] >> 4 {
+	case 4:
+		layerType = layers.LayerTypeIPv4
+	case 6:
+		layerType = layers.LayerTypeIPv6
+	default:
+		return nil
+	}
+	return gopacket.NewPacket(data, layerType, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
 }
 
 func (t *Interface) Open() (err error) {
@@ -56,27 +69,17 @@ func (t *Interface) Open() (err error) {
 	t.stopEvent, _ = kernel32.CreateEvent(true, false, "StopEvent")
 	t.readEvent = t.session.ReadWaitEvent()
 
-	t.channel = make(chan gopacket.Packet)
+	t.channel = make(chan []byte)
 
 	go func() {
 		for {
 			data, err := t.session.ReceivePacket()
 
 			if err == nil {
-
-				var layerType gopacket.LayerType
-				switch data[0] >> 4 {
-				case 4:
-					layerType = layers.LayerTypeIPv4
-				case 6:
-					layerType = layers.LayerTypeIPv6
-				default:
-					fmt.Println("Unknown IP version")
-					continue
-				}
-
+				data_copy := make([]byte, len(data))
+				copy(data_copy, data)
 				t.session.ReleaseReceivePacket(data)
-				t.channel <- gopacket.NewPacket(data, layerType, gopacket.Lazy)
+				t.channel <- data_copy
 
 			} else {
 				switch err {
@@ -112,21 +115,21 @@ func (t *Interface) Close() error {
 	return t.adapter.Close()
 }
 
-func (t *Interface) ReceivePacketAsync() <-chan gopacket.Packet {
+func (t *Interface) ReceiveAsync() <-chan []byte {
 	return t.channel
 }
 
-func (t *Interface) SendBytes(data []byte) (err error) {
+func (t *Interface) Receive() []byte {
+	return <-t.channel
+}
+
+func (t *Interface) Send(data []byte) (err error) {
 	buffer, err := t.session.AllocateSendPacket(len(data))
 	if err == nil {
 		copy(buffer, data)
 		t.session.SendPacket(buffer)
 	}
 	return
-}
-
-func (t *Interface) SendPacket(packet gopacket.Packet) error {
-	return t.SendBytes(packet.Data())
 }
 
 func (t *Interface) WaitForExit(duration uint32) bool {

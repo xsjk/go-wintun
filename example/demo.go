@@ -20,8 +20,8 @@ func main() {
 	defer iface.Close()
 
 	go func() {
-		for packet := range iface.ReceivePacketAsync() {
-			fmt.Println(packet)
+		for data := range iface.ReceiveAsync() {
+			fmt.Println(wintun.Decode(data))
 		}
 	}()
 
